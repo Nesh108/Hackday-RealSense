@@ -17,6 +17,7 @@ Copyright(c) 2011-2014 Intel Corporation. All Rights Reserved.
 #include <array>
 #include "tracking.h"
 
+#include "markersFinder.h"
 
 int wmain(int argc, WCHAR* argv[]) {
     /* Creates an instance of the PXCSenseManager */
@@ -93,6 +94,36 @@ int wmain(int argc, WCHAR* argv[]) {
             }
 
 			const PXCCapture::Sample *sample = pp->QuerySample();
+
+			PXCImage::ImageData data;
+				PXCImage::ImageInfo dataInfo;
+
+				// OPENCV Stuff
+				if (sample->color->AcquireAccess(PXCImage::ACCESS_READ, PXCImage::PixelFormat::PIXEL_FORMAT_RGB24, &data) >= PXC_STATUS_NO_ERROR)
+				{
+					dataInfo = sample->color->QueryInfo();
+					
+					IplImage* colorimg = cvCreateImageHeader(cvSize(dataInfo.width, dataInfo.height), 8, 3);
+					cvSetData(colorimg, (uchar*)data.planes[0], dataInfo.width * 3);
+					cv::Mat image(colorimg);
+					Mat dest;
+					vector<Point2f> square_centers = findSquares(image, dest, 0.04);
+					
+					Point text_pos;
+					text_pos.x = 40;
+					text_pos.y = 40;
+					char fc[200];
+
+					sprintf(fc, "Found: %d squares.", square_centers.size());
+					putText(dest, fc, text_pos, FONT_HERSHEY_PLAIN, 3,
+						Scalar::all(255), 2, CV_AA);
+
+					imshow("OpenCV", dest);
+					waitKey(10);
+					sample->color->ReleaseAccess(&data);
+				}
+				////////
+
 			manipulate_pixels(sample);
 
             /* Render streams, unless -noRender is selected */
